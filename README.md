@@ -18,6 +18,7 @@ O projeto implementa **compressão de texto com o algoritmo de Huffman**, usando
 - [Visão geral do fluxo](#visão-geral-do-fluxo)
 - [Programa 1: Codificador](#programa-1-codificador)
 - [Programa 2: Decodificador](#programa-2-decodificador)
+- [A union byte](#a-union-byte)
 - [Formato dos arquivos gerados](#formato-dos-arquivos-gerados)
 - [Estruturas de dados utilizadas](#estruturas-de-dados-utilizadas)
 - [Como compilar e executar](#como-compilar-e-executar)
@@ -71,7 +72,7 @@ Texto.txt ──► lista de palavras/frequências ──► árvore de Huffman 
                                                                          │
                   ┌──────────────────────────────────────────────────────┤
                   ▼                                                      ▼
-          registros.bin                                   frase de teste ──► bits ──► frase.bin
+          registros.dat                                   frase de teste ──► bits ──► frase.dat
      (símbolo, palavra, código)                                       (gravada byte a byte)
                   │                                                      │
                   └───────────────────────┬──────────────────────────────┘
@@ -124,7 +125,7 @@ O programa mostra:
 - **a árvore de Huffman em formato horizontal**, com o ramo da direita (`1`) no topo e o da esquerda (`0`) embaixo. As folhas aparecem como `[símbolo] f=frequência` e os nós internos como `(soma das frequências)`.
 ### 6. Gravação da tabela em disco
  
-Os registros são gravados em **`registros.bin`** (arquivo binário). A **frequência não é gravada**, apenas símbolo, palavra e código.
+Os registros são gravados em **`registros.dat`** (arquivo binário). A **frequência não é gravada**, apenas símbolo, palavra e código.
  
 ### 7. Codificação de uma frase
  
@@ -132,7 +133,7 @@ Uma **frase diferente da usada na construção da árvore** (fixa no código, se
  
 1. A frase é separada em palavras e espaços, com a mesma regra da leitura do texto.
 2. O código de cada palavra/espaço é buscado na lista e concatenado numa sequência de bits.
-3. A sequência é empacotada em bytes e gravada em **`frase.bin`**. O empacotamento usa uma `union` que sobrepõe 8 campos de 1 bit a um `unsigned char`, permitindo montar cada byte bit a bit.
+3. A sequência é empacotada em bytes e gravada em **`frase.dat`**. O empacotamento usa a `union byte` (veja [A union byte](#a-union-byte)): para cada byte, zera-se o valor, liga-se com `ligarBit` cada posição cujo bit da sequência é `1` e grava-se o byte com `fwrite`.
 4. O arquivo guarda no início a **quantidade de bits válidos**, porque o último byte quase nunca é preenchido por completo.
 ---
  
@@ -142,26 +143,68 @@ Arquivo: `decodificador.c`
  
 ### 1. Reconstrução da árvore
  
-O programa lê o `registros.bin` e monta uma árvore binária a partir dos **códigos** gravados. Para cada registro, percorre-se o código bit a bit a partir da raiz (`0` vai para a esquerda, `1` para a direita), criando os nós que ainda não existem. O último nó do caminho passa a ser uma folha com o símbolo.
+O programa lê o `registros.dat` e monta uma árvore binária a partir dos **códigos** gravados. Para cada registro, percorre-se o código bit a bit a partir da raiz (`0` vai para a esquerda, `1` para a direita), criando os nós que ainda não existem. O último nó do caminho passa a ser uma folha com o símbolo.
+ 
+A leitura do arquivo segue o padrão **"entra lido e sai lido"**: o primeiro registro é lido antes do laço e o próximo é lido no final de cada iteração, com o laço controlado por `!feof(arq)`. Assim o `fread` não fica dentro da condição do `while`.
  
 ### 2. Leitura da frase codificada
  
-O programa abre o `frase.bin`, lê a quantidade de bits válidos e depois os bytes, extraindo os bits na mesma ordem em que foram gravados (`b0` até `b7`).
+O programa abre o `frase.dat`, lê a quantidade de bits válidos e depois os bytes, extraindo os bits na mesma ordem em que foram gravados (posição 0 até 7, com `lerBit`). Os bytes também seguem o padrão "entra lido e sai lido": o primeiro byte é lido antes do laço e o seguinte no final de cada iteração.
  
 ### 3. Decodificação
  
 Para cada bit, desce-se na árvore. Ao chegar numa **folha**:
  
-1. o programa **abre o `registros.bin` e busca o registro com aquele símbolo**, obtendo a palavra (ou o espaço);
+1. o programa **abre o `registros.dat` e busca o registro com aquele símbolo**, obtendo a palavra (ou o espaço). Essa busca também usa o padrão "entra lido e sai lido", parando ao achar o símbolo ou ao chegar no fim do arquivo;
 2. a palavra é concatenada na string da frase;
 3. o percurso volta à raiz.
 O processo termina ao consumir todos os bits válidos, ignorando os bits de preenchimento do último byte. Ao final, a **frase decodificada é exibida na tela**.
  
 ---
  
+## A union byte
+ 
+Os dois programas usam a `union byte` no formato ensinado pelo professor:
+ 
+```c
+union byte
+{
+    unsigned char b0 : 1;
+    unsigned char b1 : 1;
+    unsigned char b2 : 1;
+    unsigned char b3 : 1;
+    unsigned char b4 : 1;
+    unsigned char b5 : 1;
+    unsigned char b6 : 1;
+    unsigned char b7 : 1;
+};
+```
+ 
+Ela ocupa **1 byte**. Como todos os campos `b0` a `b7` de uma `union` começam na mesma posição, eles compartilham o mesmo bit, e por isso não servem para guardar 8 bits diferentes ao mesmo tempo. Para montar e ler um byte inteiro, o programa acessa o byte da `union` por um ponteiro `unsigned char *` e usa operações de bits (deslocamento e máscara):
+ 
+```c
+// codificador.c: liga o bit "pos" (0 a 7) do byte
+void ligarBit(union byte *u, int pos)
+{
+    unsigned char *byte = (unsigned char *)u;
+    *byte = *byte | (1 << pos);
+}
+ 
+// decodificador.c: lê o bit "pos" (0 a 7) do byte
+int lerBit(union byte u, int pos)
+{
+    unsigned char byte = *(unsigned char *)&u;
+    return (byte >> pos) & 1;
+}
+```
+ 
+A gravação e a leitura em disco usam `sizeof(union byte)` e o endereço da própria `union` (`fwrite(&u, sizeof(union byte), 1, arq)` e `fread(&u, sizeof(union byte), 1, arq)`).
+ 
+---
+ 
 ## Formato dos arquivos gerados
  
-### `registros.bin`
+### `registros.dat`
  
 Sequência de registros de tamanho fixo, sem cabeçalho:
  
@@ -175,13 +218,13 @@ struct registro {
  
 > A struct `Registro` precisa ser **idêntica nos dois programas**; caso contrário, a leitura com `fread` fica desalinhada.
  
-### `frase.bin`
+### `frase.dat`
  
 ```
 [ int: quantidade de bits válidos ][ byte 1 ][ byte 2 ] ... [ byte N ]
 ```
  
-Dentro de cada byte, o **primeiro bit da sequência** fica em `b0`, o segundo em `b1`, e assim por diante até `b7`. O último byte pode ter bits de preenchimento no final, que são descartados com base na quantidade de bits válidos.
+Dentro de cada byte, o **primeiro bit da sequência** fica na posição 0 (bit menos significativo), o segundo na posição 1, e assim por diante até a posição 7. O último byte pode ter bits de preenchimento no final, que são descartados com base na quantidade de bits válidos.
  
 ---
  
@@ -192,7 +235,7 @@ Dentro de cada byte, o **primeiro bit da sequência** fica em `b0`, o segundo em
 | Lista encadeada ordenada de registros (`Lista`) | Guarda símbolo, palavra, frequência e código; mantida em ordem crescente de frequência |
 | Lista encadeada ordenada de árvores (`Lista_arvh`) | "Floresta" usada na construção da árvore de Huffman |
 | Árvore binária (`Arvh`) | Árvore de Huffman, com nós `union` (frequência total para nós internos, frequência e símbolo para folhas) |
-| `union byte` | Montagem e leitura de bytes bit a bit |
+| `union byte` | Representa 1 byte, usado para montar e ler os bytes da frase codificada bit a bit (veja [A union byte](#a-union-byte)) |
  
 ---
  
@@ -205,10 +248,10 @@ Requisitos: um compilador C (por exemplo, `gcc`).
 gcc codificador.c -o codificador
 gcc decodificador.c -o decodificador
  
-# 2. Executar o codificador (gera registros.bin e frase.bin)
+# 2. Executar o codificador (gera registros.dat e frase.dat)
 ./codificador
  
-# 3. Executar o decodificador na MESMA pasta (lê registros.bin e frase.bin)
+# 3. Executar o decodificador na MESMA pasta (lê registros.dat e frase.dat)
 ./decodificador
 ```
  
@@ -239,7 +282,9 @@ Trabalho-EDII/
 - A frase de codificação deve ser **diferente** da usada na montagem da árvore.
 - Palavras são limitadas a 29 caracteres e códigos a 127 bits (tamanho dos vetores das structs).
 - A construção da árvore usa inserção ordenada em lista encadeada, então tem custo quadrático no número de símbolos distintos. Isso é adequado para o tamanho do trabalho, mas um heap seria mais eficiente para grandes volumes.
-- A decodificação busca cada palavra diretamente no arquivo `registros.bin`, conforme pedido no enunciado, o que é mais lento do que manter a tabela em memória.
+- A decodificação busca cada palavra diretamente no arquivo `registros.dat`, conforme pedido no enunciado, o que é mais lento do que manter a tabela em memória.
+- Os campos `b0` a `b7` da `union byte` compartilham o mesmo bit; por isso o acesso aos bits de cada byte é feito com ponteiro `unsigned char *` e operações de deslocamento e máscara, e não pelos campos individualmente.
+- A vírgula e o ponto não são codificados (são tratados como separadores), então a frase decodificada não os reproduz.
 ---
  
 ## Autores

@@ -4,18 +4,14 @@
 
 union byte
 {
-    struct
-    {
-        unsigned char b0 : 1;
-        unsigned char b1 : 1;
-        unsigned char b2 : 1;
-        unsigned char b3 : 1;
-        unsigned char b4 : 1;
-        unsigned char b5 : 1;
-        unsigned char b6 : 1;
-        unsigned char b7 : 1;
-    } bits;
-    unsigned char num;
+    unsigned char b0 : 1;
+    unsigned char b1 : 1;
+    unsigned char b2 : 1;
+    unsigned char b3 : 1;
+    unsigned char b4 : 1;
+    unsigned char b5 : 1;
+    unsigned char b6 : 1;
+    unsigned char b7 : 1;
 };
 
 struct registro
@@ -447,27 +443,15 @@ void codificarFrase(Lista *lista, char *frase, char *bits)
 
 void ligarBit(union byte *u, int pos)
 {
-    if (pos == 0)
-        u->bits.b0 = 1;
-    else if (pos == 1)
-        u->bits.b1 = 1;
-    else if (pos == 2)
-        u->bits.b2 = 1;
-    else if (pos == 3)
-        u->bits.b3 = 1;
-    else if (pos == 4)
-        u->bits.b4 = 1;
-    else if (pos == 5)
-        u->bits.b5 = 1;
-    else if (pos == 6)
-        u->bits.b6 = 1;
-    else
-        u->bits.b7 = 1;
+    unsigned char *byte = (unsigned char *)u;
+
+    *byte = *byte | (1 << pos);
 }
 
 void gravarFrase(char *bits)
 {
     union byte u;
+    unsigned char *byte = (unsigned char *)&u;
     int qtdBits = strlen(bits), pos = 0, i;
     FILE *arq = fopen("frase.dat", "wb");
 
@@ -478,7 +462,7 @@ void gravarFrase(char *bits)
 
         while (pos < qtdBits)
         {
-            u.num = 0;
+            *byte = 0;
             i = 0;
 
             while (i < 8 && pos < qtdBits)
@@ -489,7 +473,7 @@ void gravarFrase(char *bits)
                 pos++;
             }
 
-            fwrite(&u.num, sizeof(unsigned char), 1, arq);
+            fwrite(&u, sizeof(union byte), 1, arq);
         }
         fclose(arq);
     }

@@ -4,18 +4,14 @@
 
 union byte
 {
-    struct
-    {
-        unsigned char b0 : 1;
-        unsigned char b1 : 1;
-        unsigned char b2 : 1;
-        unsigned char b3 : 1;
-        unsigned char b4 : 1;
-        unsigned char b5 : 1;
-        unsigned char b6 : 1;
-        unsigned char b7 : 1;
-    } bits;
-    unsigned char num;
+    unsigned char b0 : 1;
+    unsigned char b1 : 1;
+    unsigned char b2 : 1;
+    unsigned char b3 : 1;
+    unsigned char b4 : 1;
+    unsigned char b5 : 1;
+    unsigned char b6 : 1;
+    unsigned char b7 : 1;
 };
 
 struct registro
@@ -97,8 +93,10 @@ void montarArvore(Arvh **raiz)
     {
         criaNo(raiz);
 
-        while (fread(&reg, sizeof(Registro), 1, arq) == 1)
+        fread(&reg, sizeof(Registro), 1, arq);
+        while (!feof(arq))
             inserirCodigo(*raiz, reg.codigo, reg.simbolo);
+            fread(&reg, sizeof(Registro), 1, arq);
 
         fclose(arq);
     }
@@ -128,26 +126,9 @@ void exibirArvore(Arvh *no, int nivel)
 
 int lerBit(union byte u, int pos)
 {
-    int bit;
+    unsigned char byte = *(unsigned char *)&u;
 
-    if (pos == 0)
-        bit = u.bits.b0;
-    else if (pos == 1)
-        bit = u.bits.b1;
-    else if (pos == 2)
-        bit = u.bits.b2;
-    else if (pos == 3)
-        bit = u.bits.b3;
-    else if (pos == 4)
-        bit = u.bits.b4;
-    else if (pos == 5)
-        bit = u.bits.b5;
-    else if (pos == 6)
-        bit = u.bits.b6;
-    else
-        bit = u.bits.b7;
-
-    return bit;
+    return (byte >> pos) & 1;
 }
 
 void buscarPalavraArquivo(int simbolo, char *palavra)
@@ -160,13 +141,15 @@ void buscarPalavraArquivo(int simbolo, char *palavra)
 
     if (arq != NULL)
     {
-        while (!achou && fread(&reg, sizeof(Registro), 1, arq) == 1)
+        fread(&reg, sizeof(Registro), 1, arq);
+        while (!feof(arq) && !achou)
         {
             if (reg.simbolo == simbolo)
             {
                 strcpy(palavra, reg.palavra);
                 achou = 1;
             }
+            fread(&reg, sizeof(Registro), 1, arq);
         }
         fclose(arq);
     }
@@ -187,8 +170,9 @@ void decodificarFrase(Arvh *raiz, char *frase)
     if (arq != NULL)
     {
         fread(&qtdBits, sizeof(int), 1, arq);
+        fread(&u, sizeof(union byte), 1, arq);
 
-        while (lidos < qtdBits && fread(&u.num, sizeof(unsigned char), 1, arq) == 1)
+        while (!feof(arq) && lidos < qtdBits)
         {
             i = 0;
             while (i < 8 && lidos < qtdBits)
@@ -208,6 +192,7 @@ void decodificarFrase(Arvh *raiz, char *frase)
                 i++;
                 lidos++;
             }
+            fread(&u, sizeof(union byte), 1, arq);
         }
         fclose(arq);
     }
