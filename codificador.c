@@ -61,14 +61,7 @@ void criarArvoreH(Arvh **arvh, Lista *lista);
 void criaNoArvoreFolha(Arvh **arvh, Lista *lista);
 void criaNoArvore(Arvh **arvh, Arvh *menor, Arvh *segMenor);
 void insereArvoreH(Arvh **raiz, Arvh *subArvore);
-
-
-char verificaArquivo(FILE *arq)
-{
-    if(arq == NULL)
-        return 1;
-    return 0;
-}
+void contabilizar(Lista **lista, char *palavra, int *simbolo);
 
 char verificaMaiusculo(int c)
 {
@@ -77,63 +70,66 @@ char verificaMaiusculo(int c)
     return 0;
 }
 
+void contabilizar(Lista **lista, char *palavra, int *simbolo)
+{
+    Lista *aux = buscarPalavra(*lista, palavra), *novo;
+    Lista **atual;
+
+    if(aux != NULL)
+    {
+        atual = lista;
+        while(*atual != aux && (*atual) -> prox != NULL)
+            atual = &(*atual)->prox;
+        *atual = aux->prox;
+
+        aux->freq++;
+        aux->prox = NULL;
+        inserirOrdenado(lista, aux);
+    }
+    else
+    {
+        criaNoLista(&novo, *simbolo, palavra);
+        if(novo != NULL)
+        {
+            inserirOrdenado(lista, novo);
+            (*simbolo)++;
+        }
+    }
+}
+
 
 void lerArquivo(Lista **lista)
 {
-    char palavra[100];
+    char palavra[30];
     int i = 0, simbolo = 0,caracter;
-    Lista *aux, *novo;
-    Lista **atual;
-    FILE *arq = fopen("Texto.txt","r");
-    if(verificaArquivo(arq))
+    FILE *arq = fopen("../Texto.txt","r");
+    if(arq != NULL)
     {   
-        printf("Arquivo aberto");
+        printf("Arquivo aberto\n\n");
         while(!feof(arq))
         {
             caracter = fgetc(arq);
             //Lê a palavra inteira
-
-            if(verificaMaiusculo(caracter))
-                caracter -= 32;
-
-            if(caracter != EOF &&  caracter != ' ' && caracter != '.' && caracter != ',')
+            if(caracter != EOF)
             {
-                palavra[i] = caracter;
-                i++;
-            }
-            else if(i > 0) //Faz a inserção na lista dinamica
-            {
-                palavra[i] = '\0';
-                aux = buscarPalavra(*lista, palavra);
+                
 
-                if(aux != NULL)
+                if(caracter != EOF &&  caracter != ' ' && caracter != '.' && caracter != ',' && caracter != 10 && caracter != 13)
                 {
-                    atual = lista;
-
-                    while(*atual != aux)
-                        atual = &(*atual) -> prox;
-                    *atual = aux -> prox;
-
-                    aux -> freq++;
-                    aux -> prox = NULL;
-
-                    inserirOrdenado(lista,aux);
+                    palavra[i] = caracter;
+                    i++;
                 }
-                else
+                else if(i > 0) //Faz a inserção na lista dinamica
                 {
-                    criaNoLista(&novo, simbolo, palavra);
-
-                    if(novo != NULL)
-                    {
-                        inserirOrdenado(lista,novo);
-                        simbolo++;
-                    }
+                    palavra[i] = '\0';
+                    contabilizar(lista, palavra, &simbolo);
+                    i = 0;
                 }
 
-                i = 0;
+                if(caracter == ' ')
+                    contabilizar(lista," ", &simbolo);
             }
-
-        }
+        }   
         fclose(arq);
     }
     else
