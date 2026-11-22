@@ -60,7 +60,7 @@ Lista *menores(Lista *lista, Lista **menor, Lista **segMenor);
 void criarArvoreH(Arvh **arvh, Lista *lista);
 void criaNoArvoreFolha(Arvh **arvh, Lista *lista);
 void criaNoArvore(Arvh **arvh, Arvh *menor, Arvh *segMenor);
-void insereArvoreH(Arvh **raiz, Arvh *subArvore);
+int insereArvoreH(Lista_arvh **lista, Arvh *subArvore);
 void contabilizar(Lista **lista, char *palavra, int *simbolo);
 
 char verificaMaiusculo(int c)
@@ -222,53 +222,128 @@ Lista *buscarPalavra(Lista *lista, char palavra[30])
     return NULL;
 }
 
-void criarArvoreH(Arvh ** raiz, Lista *lista)
+void criarArvoreH(Arvh **raiz, Lista *lista)
 {
-    Lista *menor, *segMenor;
-    Arvh *novoMenor, *novoSegMenor, *arvore;
-    Lista_arvh *raizes;
-    while (lista != NULL && lista->prox != NULL)
-    {
-        lista = menores(lista, &menor, &segMenor);
+    Lista_arvh *fila = NULL;
+    Arvh *esq, *dir, *pai;
+    int continuar = 1;
 
-        if (menor != NULL && segMenor != NULL)
-        {
-            criaNoArvoreFolha(&novoMenor, menor);
-            criaNoArvoreFolha(&novoSegMenor, segMenor);
-        }
+    *raiz = NULL;
+
+    // Cria uma folha para cada palavra/símbolo da lista de frequências.
+    while (lista != NULL && continuar)
+    {
+        Arvh *folha = NULL;
+        Lista *proximo = lista->prox;
+
+        criaNoArvoreFolha(&folha, lista);
+        if (folha == NULL)
+            continuar = 0;
         else
         {
-
+            if (insereArvoreH(&fila, folha))
+                lista = proximo;
+            else
+            {
+                free(folha);
+                continuar = 0;
+            }
         }
-        
-        criaNoArvore(&arvore, novoMenor, novoSegMenor);
+    }
 
-        insereArvoreH(&*raiz, arvore);
+    // Junta sempre as duas subárvores de menor frequência.
+    while (fila != NULL && fila->prox != NULL && continuar)
+    {
+        Lista_arvh *remover = fila;
+        esq = remover->raiz;
+        fila = remover->prox;
+        free(remover);
 
+        remover = fila;
+        dir = remover->raiz;
+        fila = remover->prox;
+        free(remover);
+
+        pai = NULL;
+        criaNoArvore(&pai, esq, dir);
+        if (pai == NULL)
+            continuar = 0;
+        else if (!insereArvoreH(&fila, pai))
+        {
+            free(pai);
+            continuar = 0;
+        }
+    }
+
+    if (continuar && fila != NULL)
+    {
+        *raiz = fila->raiz;
+        free(fila);
+    }
+
+    // Se a construção falhou, libera os nós da fila que ainda não foram unidos.
+    if (!continuar)
+    {
+        while (fila != NULL)
+        {
+            Lista_arvh *remover = fila;
+            fila = fila->prox;
+            free(remover->raiz);
+            free(remover);
+        }
     }
 }
 
-void insereArvoreH(Arvh ** raiz, Arvh *subArvore)
+int insereArvoreH(Lista_arvh **lista, Arvh *subArvore)
 {
-    
+    Lista_arvh *novo, **atual;
+    int inserido = 0;
+
+    if (lista != NULL && subArvore != NULL)
+    {
+        novo = (Lista_arvh *)malloc(sizeof(Lista_arvh));
+        if (novo != NULL)
+        {
+            novo->raiz = subArvore;
+            novo->prox = NULL;
+
+            // Insere em ordem crescente de frequência.
+            atual = lista;
+            while (*atual != NULL &&
+                   (*atual)->raiz->no.freqTotal <= subArvore->no.freqTotal)
+                atual = &(*atual)->prox;
+
+            novo->prox = *atual;
+            *atual = novo;
+            inserido = 1;
+        }
+    }
+
+    return inserido;
 }
 
 void criaNoArvoreFolha(Arvh **arvh, Lista *lista)
 {
     *arvh = (Arvh *)malloc(sizeof(Arvh));
+    if (*arvh != NULL)
+    {
+        (*arvh)->dir = (*arvh)->esq = NULL;
 
-    (*arvh)->dir = (*arvh)->esq = NULL;
-
-    (*arvh)->no.folha.freq = lista->freq;
-    (*arvh)->no.folha.simbolo = lista->simbolo;
+        (*arvh)->no.folha.freq = lista->freq;
+        (*arvh)->no.folha.simbolo = lista->simbolo;
+    }
 }
 
 void criaNoArvore(Arvh **arvh, Arvh *menor, Arvh *segMenor)
 {
-    (*arvh)->esq = menor;
-    (*arvh)->dir = segMenor;
+    *arvh = (Arvh *)malloc(sizeof(Arvh));
+    if (*arvh != NULL)
+    {
+        (*arvh)->esq = menor;
+        (*arvh)->dir = segMenor;
 
-    (*arvh)->no.freqTotal = menor->no.folha.freq + segMenor->no.folha.freq;
+        (*arvh)->no.freqTotal = menor->no.freqTotal + segMenor->no.freqTotal;
+    }
 }
 
 Arvh *init()
@@ -283,7 +358,7 @@ Arvh *init()
 int main()
 {
     Lista *lista = NULL;
-    Arvh *arvh = init();
+    Arvh *arvh = NULL;
 
     printf("Codificacao\n");
 
