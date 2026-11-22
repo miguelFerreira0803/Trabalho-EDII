@@ -95,8 +95,10 @@ void montarArvore(Arvh **raiz)
 
         fread(&reg, sizeof(Registro), 1, arq);
         while (!feof(arq))
+        {
             inserirCodigo(*raiz, reg.codigo, reg.simbolo);
             fread(&reg, sizeof(Registro), 1, arq);
+        }
 
         fclose(arq);
     }
