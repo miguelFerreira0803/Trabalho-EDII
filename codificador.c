@@ -4,17 +4,27 @@
 
 union byte
 {
-    unsigned char b0 : 1;
-    unsigned char b1 : 1;
-    unsigned char b2 : 1;
-    unsigned char b3 : 1;
-    unsigned char b4 : 1;
-    unsigned char b5 : 1;
-    unsigned char b6 : 1;
-    unsigned char b7 : 1;
+    struct
+    {
+        unsigned char b0 : 1;
+        unsigned char b1 : 1;
+        unsigned char b2 : 1;
+        unsigned char b3 : 1;
+        unsigned char b4 : 1;
+        unsigned char b5 : 1;
+        unsigned char b6 : 1;
+        unsigned char b7 : 1;
+    } bits;
+    unsigned char num;
 };
 
-
+struct registro
+{
+    int simbolo;
+    char palavra[30];
+    char codigo[128];
+};
+typedef struct registro Registro;
 
 struct lista
 {
@@ -65,6 +75,8 @@ void insereArvoreH(Lista_arvh **raiz, Arvh *subArvore);
 void contabilizar(Lista **lista, char *palavra, int *simbolo);
 int ehFolha(Arvh *no);
 void gerarCodigos(Arvh *no, Lista *lista, char *cod, int nivel);
+void gravarRegistros(Lista *lista);
+void exibirArvore(Arvh *no, int nivel);
 
 char verificaMaiusculo(int c)
 {
@@ -313,33 +325,55 @@ int ehFolha(Arvh *no)
 
 void gerarCodigos(Arvh *no, Lista *lista, char *cod, int nivel)
 {
-    if (no == NULL)
-        return;
-
-    if (ehFolha(no))
+    if (no != NULL)
     {
-        cod[nivel] = '\0';
-
-        Lista *aux = lista;
-        while (aux != NULL && aux->simbolo != no->no.folha.simbolo)
-            aux = aux->prox;
-
-        if (aux != NULL)
+        if (ehFolha(no))
         {
-            if (nivel == 0)
-                strcpy(aux->codigo, "0");
-            else
-                strcpy(aux->codigo, cod);
+            cod[nivel] = '\0';
+
+            Lista *aux = lista;
+            while (aux != NULL && aux->simbolo != no->no.folha.simbolo)
+                aux = aux->prox;
+
+            if (aux != NULL)
+            {
+                if (nivel == 0)
+                    strcpy(aux->codigo, "0");
+                else
+                    strcpy(aux->codigo, cod);
+            }
+        }
+        else
+        {
+            cod[nivel] = '0';
+            gerarCodigos(no->esq, lista, cod, nivel + 1);
+
+            cod[nivel] = '1';
+            gerarCodigos(no->dir, lista, cod, nivel + 1);
         }
     }
-    else
-    {
-        cod[nivel] = '0';
-        gerarCodigos(no->esq, lista, cod, nivel + 1);
+}
 
-        cod[nivel] = '1';
-        gerarCodigos(no->dir, lista, cod, nivel + 1);
+void gravarRegistros(Lista *lista)
+{
+    Registro reg;
+    FILE *arq = fopen("registros.dat", "wb");
+
+    if (arq != NULL)
+    {
+        while (lista != NULL)
+        {
+            reg.simbolo = lista->simbolo;
+            strcpy(reg.palavra, lista->palavra);
+            strcpy(reg.codigo, lista->codigo);
+
+            fwrite(&reg, sizeof(Registro), 1, arq);
+            lista = lista->prox;
+        }
+        fclose(arq);
     }
+    else
+        printf("Erro ao criar registros.dat\n");
 }
 
 
