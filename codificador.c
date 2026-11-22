@@ -376,6 +376,25 @@ void gravarRegistros(Lista *lista)
         printf("Erro ao criar registros.dat\n");
 }
 
+void exibirArvore(Arvh *no, int nivel)
+{
+    int i;
+
+    if (no != NULL)
+    {
+        exibirArvore(no->dir, nivel + 1);
+
+        for (i = 0; i < nivel; i++)
+            printf("      ");
+
+        if (ehFolha(no))
+            printf("[%d] f=%d\n", no->no.folha.simbolo, no->no.folha.freq);
+        else
+            printf("(%d)\n", no->no.freqTotal);
+
+        exibirArvore(no->esq, nivel + 1);
+    }
+}
 
 int main()
 {
