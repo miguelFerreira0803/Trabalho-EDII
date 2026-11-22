@@ -77,6 +77,10 @@ int ehFolha(Arvh *no);
 void gerarCodigos(Arvh *no, Lista *lista, char *cod, int nivel);
 void gravarRegistros(Lista *lista);
 void exibirArvore(Arvh *no, int nivel);
+void adicionarCodigo(Lista *lista, char *palavra, char *bits);
+void codificarFrase(Lista *lista, char *frase, char *bits);
+void ligarBit(union byte *u, int pos);
+void gravarFrase(char *bits);
 
 char verificaMaiusculo(int c)
 {
@@ -396,20 +400,126 @@ void exibirArvore(Arvh *no, int nivel)
     }
 }
 
+void adicionarCodigo(Lista *lista, char *palavra, char *bits)
+{
+    Lista *aux = buscarPalavra(lista, palavra);
+
+    if (aux != NULL)
+        strcat(bits, aux->codigo);
+    else
+        printf("Palavra fora da arvore: %s\n", palavra);
+}
+
+void codificarFrase(Lista *lista, char *frase, char *bits)
+{
+    char palavra[30];
+    int i = 0, j;
+
+    bits[0] = '\0';
+
+    for (j = 0; frase[j] != '\0'; j++)
+    {
+        if (frase[j] != ' ' && frase[j] != '.' && frase[j] != ',')
+        {
+            palavra[i] = frase[j];
+            i++;
+        }
+        else
+        {
+            if (i > 0)
+            {
+                palavra[i] = '\0';
+                adicionarCodigo(lista, palavra, bits);
+                i = 0;
+            }
+
+            if (frase[j] == ' ')
+                adicionarCodigo(lista, " ", bits);
+        }
+    }
+
+    if (i > 0)
+    {
+        palavra[i] = '\0';
+        adicionarCodigo(lista, palavra, bits);
+    }
+}
+
+void ligarBit(union byte *u, int pos)
+{
+    if (pos == 0)
+        u->bits.b0 = 1;
+    else if (pos == 1)
+        u->bits.b1 = 1;
+    else if (pos == 2)
+        u->bits.b2 = 1;
+    else if (pos == 3)
+        u->bits.b3 = 1;
+    else if (pos == 4)
+        u->bits.b4 = 1;
+    else if (pos == 5)
+        u->bits.b5 = 1;
+    else if (pos == 6)
+        u->bits.b6 = 1;
+    else
+        u->bits.b7 = 1;
+}
+
+void gravarFrase(char *bits)
+{
+    union byte u;
+    int qtdBits = strlen(bits), pos = 0, i;
+    FILE *arq = fopen("frase.dat", "wb");
+
+    if (arq != NULL)
+    {
+        // Guarda quantos bits são válidos, pois o último byte quase nunca fecha 8
+        fwrite(&qtdBits, sizeof(int), 1, arq);
+
+        while (pos < qtdBits)
+        {
+            u.num = 0;
+            i = 0;
+
+            while (i < 8 && pos < qtdBits)
+            {
+                if (bits[pos] == '1')
+                    ligarBit(&u, i);
+                i++;
+                pos++;
+            }
+
+            fwrite(&u.num, sizeof(unsigned char), 1, arq);
+        }
+        fclose(arq);
+    }
+    else
+        printf("Erro ao criar frase.dat\n");
+}
+
 int main()
 {
-    char cod[128];
+    char cod[128], bits[4096];
+    char frase[] = "cada um terá um tempo para sonhar, viver é amar";
     Lista *lista = NULL;
     Arvh *arvh = NULL;
 
     printf("Codificacao\n");
 
     lerArquivo(&lista);
-    //exibirLista(lista);
-
     criarArvoreH(&arvh, lista);
     gerarCodigos(arvh, lista, cod, 0);
+
     exibirLista(lista);
+
+    printf("\nArvore de Huffman (topo = direita/1, base = esquerda/0):\n\n");
+    exibirArvore(arvh, 0);
+
+    gravarRegistros(lista);
+
+    codificarFrase(lista, frase, bits);
+    printf("\nFrase: %s\nBits: %s\n", frase, bits);
+    gravarFrase(bits);
 
     return 0;
 }
